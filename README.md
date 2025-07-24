@@ -24,7 +24,7 @@
 |--------------|--------------------------|
 | Backend      | Django, Django REST Framework |
 | Database     | PostgreSQL               |
-| AI Integration | Google Gemini (or OpenAI GPT) |
+| AI Integration | Google Gemini |
 | DevOps       | Docker, Docker Compose   |
 
 ---

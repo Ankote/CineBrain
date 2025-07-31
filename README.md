@@ -59,3 +59,37 @@ This project uses the official IMDb public dataset:
 ```bash
 git clone https://github.com/ankote/cinescope-ai.git
 cd cinescope-ai
+```
+
+### 2. Start with Docker
+```bash
+docker-compose up --build
+```
+Make sure PostgreSQL is accessible and your .env variables are set properly.
+
+### .ENV Template
+```bash
+# Django Configuration
+DJANGO_SETTINGS_MODULE=CineBrain.settings  with your project name
+DJANGO_SECRET_KEY=your_secret_key
+DJANGO_DEBUG=True
+
+# PostgreSQL Configuration
+POSTGRES_DB=imdb_db
+POSTGRES_USER=user
+POSTGRES_PASSWORD=your_password
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+
+DJANGO_SUPERUSER_USERNAME=username
+DJANGO_SUPERUSER_EMAIL=admin@example.com
+DJANGO_SUPERUSER_PASSWORD=password
+
+# Adminer Configuration
+ADMINER_DEFAULT_SERVER=db  # Default database server
+ADMINER_DESIGN=price  # Optional: Change Adminer theme
+ADMINER_PLUGINS=tables-filter  # Optional: Enable plugins
+```
+📬 Contact
+Feel free to contribute or open issues!
+Made with ❤️ by Ankote Ayoube.

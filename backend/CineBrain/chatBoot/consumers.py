@@ -2,40 +2,67 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 import json
 import sys
 from django.contrib.auth.models import AnonymousUser
+from django.conf import settings
+from .models import Room, Message
+from .serializers  import MessageSerializer
+from channels.db import database_sync_to_async
+
+
 class ChatConsumer(AsyncWebsocketConsumer):
   
     async def connect(self):
         
         if isinstance(self.scope['user'], AnonymousUser):
+            print("🔴 ACCESS DENIED!!", file=sys.stderr)
             await self.close()
         else:
+            from .gemini_client import get_gemini_response
+            self.get_gemini_response = get_gemini_response
             print(f"🟢 {self.scope['user'].username} Connected", file=sys.stderr)
-            self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
-            self.room_group_name = f"chat_{self.room_name}"
-            # Join room group
-            await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+            self.user = self.scope['user']
+            self.room = ""
             await self.accept()
 
     async def disconnect(self, close_code):
         print(f"🔴 {self.scope['user'].username} DISCONNECTED", file=sys.stderr)
-        # await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
 
     async def receive(self, text_data):
         print("📥 RECEIVED data", file=sys.stderr)
-        print(self.scope["user"], file=sys.stderr)
-        
         text_data_json = json.loads(text_data)
+        event = text_data_json["event"]
+        if event == 'newMessage':
+            await self.treatingMessage(text_data_json)
+        if event == "newRoom":
+            await self.createRoom()
+       
+    async def treatingMessage(self, text_data_json):
         message = text_data_json["message"]
-        sender = text_data_json["sender"]
+        prompt = message
+        prompt = [
+    {"role": "user", "parts": ["Hello"]},
+    {"role": "model", "parts": ["Hi, how can I assist you today?"]},
+    {"role": "user", "parts": ["What's the weather like in Paris?"]},
+    {"role": "model", "parts": ["I can't give you a real-time, up-to-the-minute weather forecast.?"]},
+    {"role": "user", "parts": ["can tell me what is the first question i asked you in this conversation"]},
+]
+        respons =  self.get_gemini_response(prompt)
+        await self.send(text_data=json.dumps({"message": respons}))
+        await self.storeMessages(message, respons)
+        
 
-        print(message, file=sys.stderr)
-        # Send message to room group
-        await self.channel_layer.group_send(
-            self.room_group_name, {"type": "chat.message", "from":sender, "message": message}
-        )
+    @database_sync_to_async
+    def storeMessages(self, message, response):
+        Message.objects.create(user=self.user, room=self.room, sender='H', message=message)
+        Message.objects.create(user=self.user, room=self.room, sender='AI', message=response)
 
-    async def chat_message(self, event):
-        message = event["message"]
-        sender = event["from"]
-        # Send message to WebSocket
-        await self.send(text_data=json.dumps({"from":sender, "message": message}))
+    @database_sync_to_async
+    def createRoom(self):
+        print("room", file=sys.stderr)
+        user = self.scope['user'] 
+        self.room = Room.objects.create(title='movie', user=user)
+
+    @database_sync_to_async
+    def get_chat_hestory(self):
+        messages = Message.objects.filter(room=self.room).order_by('-date')
+        
+        

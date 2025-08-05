@@ -30,6 +30,9 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 AUTH_USER_MODEL = 'users.User'
+from decouple import config
+
+GEMINI_API_KEY = config("GEMINI_API_KEY", default="fallback")
 
 
 # Application definition

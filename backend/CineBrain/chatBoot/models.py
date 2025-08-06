@@ -12,14 +12,12 @@ class Room(models.Model):
 
 class Message(models.Model):
     SENDERS = [
-        ('H', 'H'),
-        ('AI', 'AI'),
+        ('user', 'user'),
+        ('model', 'model'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
     date = models.DateTimeField(auto_now_add=True)
-    sender = models.CharField(max_length=5, choices=SENDERS, default='H')
+    sender = models.CharField(max_length=5, choices=SENDERS, default='user')
     message = models.TextField( default='')
-    
-

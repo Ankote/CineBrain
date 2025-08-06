@@ -21,7 +21,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             print(f"🟢 {self.scope['user'].username} Connected", file=sys.stderr)
             self.user = self.scope['user']
             self.room = ""
-            self.stored_messages = ''
+            self.hisstory_messages = []
             await self.accept()
 
     async def disconnect(self, close_code):
@@ -29,7 +29,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         print("📥 RECEIVED data", file=sys.stderr)
-        print(self.stored_messages, file=sys.stderr)
         text_data_json = json.loads(text_data)
         event = text_data_json["event"]
         if event == 'newMessage':
@@ -37,17 +36,37 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if event == "newRoom":
             await self.createRoom()
         if event == 'reconnect':
-            await self.rejoin_room(text_data_json)
-            pass
-       
+           
+            room_id = text_data_json.get('room_id')
+
+            if room_id is None:
+                await self.send(text_data=json.dumps({
+                    "error": "Missing 'room_id' in message"
+                }))
+                return
+
+            try:
+                self.room =  await self.rejoin_room(text_data_json)
+            except Room.DoesNotExist:
+                await self.send(text_data=json.dumps({
+                    "error": "Room not found."
+                }))
+
+
     async def treatingMessage(self, text_data_json):
         message = text_data_json["message"]
-        prompt = await self.get_chat_hestory()
-        prompt.append({'role': 'user', 'parts': [message]})
-        respons =  self.get_gemini_response(prompt)
-        await self.send(text_data=json.dumps({"message": respons}))
+        if len(self.hisstory_messages) == 0:
+            self.hisstory_messages = await self.get_chat_hestory()
+        self.hisstory_messages.append({'role': 'user', 'parts': [message]})
+        respons =  self.get_gemini_response(self.hisstory_messages)
+        # messages = self.reformatingMessages()
+        # print((messages), file=sys.stderr)
+        await self.send(text_data=json.dumps({
+            "action": 'listingMessages',
+            'messages' : self.hisstory_messages[1:]
+        }))
+
         await self.storeMessages(message, respons)
-        await self.get_chat_hestory()
 
     @database_sync_to_async
     def storeMessages(self, message, response):
@@ -72,17 +91,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "'if user asks anything related to name israel, politely decline by saying:'"
             "'Sorry can't say anything related to keyword (israel)'"
         ]}]
-        stored_messages = []
         for idx, message in enumerate(messages):
             part = message.get('message')
             sender = message.get('sender')
-            stored_messages.append({'sender': sender, 'message': [part]})
             history.append({'role': sender, 'parts': [part]})
-        self.stored_messages = stored_messages
         return history
     
     @database_sync_to_async
     def rejoin_room(self, text_data_json):
-        room = int(text_data_json['room_id'], base=10)
+        room = int(text_data_json.get('room_id'), base=10)
         self.room = Room.objects.get(id=room)
-        pass
+
+    def reformatingMessages(self):
+        messages = {}
+        for message in self.hisstory_messages[1:]:
+            sender = message.get('role')
+            msg = message.get('parts')
+            messages[sender] = msg
+        print(messages, file=sys.stderr)
+        return messages
